@@ -52,6 +52,7 @@ public class BonesGenerator : MonoBehaviour
             link = new Tuple<Vector3, Vector3>(min, minmax.Item2);
 
         GameObject boneLink = new GameObject();
+        boneLink.transform.SetParent(parent.transform);
         var lr = boneLink.AddComponent<LineRenderer>();
         lr.positionCount = 2;
         lr.SetPosition(0, (link.Item1) * transform.localScale.x);
@@ -118,6 +119,7 @@ public class BonesGenerator : MonoBehaviour
         //maxPoint.transform.position = (max.Item2 + bary) *transform.localScale.x;
 
         GameObject bone = new GameObject();
+        bone.transform.SetParent(parent.transform);
         var lr = bone.AddComponent<LineRenderer>();
         lr.positionCount = 2;
         lr.SetPosition(0, (min.Item2 + bary) * transform.localScale.x);
