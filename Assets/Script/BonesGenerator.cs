@@ -18,21 +18,7 @@ public class BonesGenerator : MonoBehaviour
 
     // Start is called before the first frame update
     void Start()
-    {/*
-        Matrix4x4 m = new Matrix4x4();
-        m[0,0] = -1;
-        m[0,1] = -1;
-        m[0,2] = -1;
-
-        m[1,0] = -1;
-        m[1,1] = 6;
-        m[1,2] = -1;
-
-        m[2,0] = -1;
-        m[2,1] = -1;
-        m[2,2] = -1;
-
-        Debug.Log(methodePuissance(m));*/
+    {
         var points = getPoints(transform.gameObject);
         var minmax = generateBones(points);
         boneStruct(transform.gameObject, minmax.Item1, minmax.Item2);
@@ -40,9 +26,12 @@ public class BonesGenerator : MonoBehaviour
 
     public void boneStruct(GameObject curGO, Vector3 max, Vector3 min)
     {
+        //On récupère les points du mesh
         var allPoints = getPoints(curGO);
+        //On génère le bone et on récupère les points extrémaux
         var minmax = generateBones(allPoints);
 
+        //On déduit les points des bones qui sont les plus prêt entre eux
         Tuple<Vector3, Vector3> link = new Tuple<Vector3, Vector3>(max, minmax.Item1);
         if (Vector3.Distance(max, minmax.Item2) < Vector3.Distance(link.Item1, link.Item2))
             link = new Tuple<Vector3, Vector3>(max, minmax.Item2);
@@ -51,27 +40,23 @@ public class BonesGenerator : MonoBehaviour
         if (Vector3.Distance(min, minmax.Item2) < Vector3.Distance(link.Item1, link.Item2))
             link = new Tuple<Vector3, Vector3>(min, minmax.Item2);
 
+        //On peut donc créer un lien entre les points les plus proche
         GameObject boneLink = new GameObject();
         boneLink.transform.SetParent(parent.transform);
         var lr = boneLink.AddComponent<LineRenderer>();
         lr.positionCount = 2;
-        lr.SetPosition(0, (link.Item1) * transform.localScale.x);
-        lr.SetPosition(1, (link.Item2) * transform.localScale.x);
+        lr.SetPosition(0, (link.Item1));
+        lr.SetPosition(1, (link.Item2));
         lr.startWidth = .03f;
         lr.endWidth = .03f;
         lr.sharedMaterial = linkMat;
 
         for (int i = 0; i < curGO.transform.childCount; i++)
         {
+            //On appelle la même fonciton sur les enfants
             var newGo = curGO.transform.GetChild(i).gameObject;
             boneStruct(newGo, minmax.Item1, minmax.Item2);
         }
-    }
-
-    void InstantiatePoint(Vector3 position)
-    {
-        GameObject newP = Instantiate(pointPrefab, position, Quaternion.identity);
-        newP.transform.parent = parent.transform;
     }
 
     Tuple<Vector3, Vector3> generateBones(List<Vector3> allPoints)
@@ -84,8 +69,6 @@ public class BonesGenerator : MonoBehaviour
         foreach (var p in allPoints)
         {
             pointsToOrigin.Add(p - bary);
-            //var point = Instantiate(pointPrefab);
-            //point.transform.position = p;
         }
         
         //On créée la matrice de covalence
@@ -94,6 +77,7 @@ public class BonesGenerator : MonoBehaviour
         //On calcule les valeurs & vecteurs propres
         var lambda = methodePuissance(matCov);
 
+        //On fait la projection des points selon l'axe
         List<Vector3> pointsProj = new List<Vector3>();
         var v0 = lambda.Item2;
         Tuple<Vector3,Vector3> max = new Tuple<Vector3, Vector3>(Vector3.zero,Vector3.zero), 
@@ -112,18 +96,13 @@ public class BonesGenerator : MonoBehaviour
             pointsProj.Add(newP);
         }
 
-        //var minPoint = Instantiate(pointPrefab);
-        //minPoint.transform.position = (min.Item2 + bary) *transform.localScale.x;
-        
-        //var maxPoint = Instantiate(pointPrefab);
-        //maxPoint.transform.position = (max.Item2 + bary) *transform.localScale.x;
-
+        //On affiche le bone
         GameObject bone = new GameObject();
         bone.transform.SetParent(parent.transform);
         var lr = bone.AddComponent<LineRenderer>();
         lr.positionCount = 2;
-        lr.SetPosition(0, (min.Item2 + bary) * transform.localScale.x);
-        lr.SetPosition(1, (max.Item2 + bary) * transform.localScale.x);
+        lr.SetPosition(0, (min.Item2 + bary));
+        lr.SetPosition(1, (max.Item2 + bary));
         lr.startWidth = .05f;
         lr.endWidth = .05f;
         lr.sharedMaterial = boneMat;
@@ -215,6 +194,8 @@ public class BonesGenerator : MonoBehaviour
 
     List<Vector3> getPoints(GameObject go)
     {
+        Matrix4x4 localToWorld = transform.localToWorldMatrix;
+
         // Assurez-vous d'avoir un MeshFilter attaché à votre GameObject
         MeshFilter meshFilter = go.GetComponent<MeshFilter>();
 
@@ -222,9 +203,15 @@ public class BonesGenerator : MonoBehaviour
         {
             // Obtenez le mesh du MeshFilter
             Mesh mesh = meshFilter.mesh;
-
+            
             // Obtenez les vertices du mesh
-            return mesh.vertices.ToList();
+            List<Vector3> localPos = mesh.vertices.ToList();
+            List<Vector3> worldPos = new List<Vector3>();
+            foreach (Vector3 pos in localPos)
+            {
+                worldPos.Add(localToWorld.MultiplyPoint3x4(pos));
+            }
+            return worldPos;
         }
         else
         {
