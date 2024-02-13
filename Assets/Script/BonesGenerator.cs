@@ -20,7 +20,8 @@ public class BonesGenerator : MonoBehaviour
     void Start()
     {
         var points = getPoints(transform.gameObject);
-        var minmax = generateBones(points);
+        bool isHead = name.Contains("head") ? true : false;
+        var minmax = generateBones(points, isHead);
         boneStruct(transform.gameObject, minmax.Item1, minmax.Item2);
     }
 
@@ -29,7 +30,8 @@ public class BonesGenerator : MonoBehaviour
         //On récupère les points du mesh
         var allPoints = getPoints(curGO);
         //On génère le bone et on récupère les points extrémaux
-        var minmax = generateBones(allPoints);
+        bool isHead = curGO.name.Contains("head") ? true : false;
+        var minmax = generateBones(allPoints, isHead);
 
         //On déduit les points des bones qui sont les plus prêt entre eux
         Tuple<Vector3, Vector3> link = new Tuple<Vector3, Vector3>(max, minmax.Item1);
@@ -59,7 +61,7 @@ public class BonesGenerator : MonoBehaviour
         }
     }
 
-    Tuple<Vector3, Vector3> generateBones(List<Vector3> allPoints)
+    Tuple<Vector3, Vector3> generateBones(List<Vector3> allPoints, bool isHead)
     {
         //Récupération du barycentre
         Vector3 bary = getBarycentre(allPoints);
@@ -73,41 +75,42 @@ public class BonesGenerator : MonoBehaviour
         
         //On créée la matrice de covalence
         Matrix4x4 matCov = getMatCovariance(pointsToOrigin);
-        
+
+        var lambda = Vector3.up;
         //On calcule les valeurs & vecteurs propres
-        var lambda = methodePuissance(matCov);
+        if(!isHead)
+            lambda = methodePuissance(matCov);
 
         //On fait la projection des points selon l'axe
-        List<Vector3> pointsProj = new List<Vector3>();
-        var v0 = lambda.Item2;
-        Tuple<Vector3,Vector3> max = new Tuple<Vector3, Vector3>(Vector3.zero,Vector3.zero), 
-            min = new Tuple<Vector3, Vector3>(Vector3.zero,Vector3.zero);
+        //List<Vector3> pointsProj = new List<Vector3>();
+        float max = float.NegativeInfinity, min = float.PositiveInfinity;
         foreach (var p in pointsToOrigin)
-        {
-            var newP = (Vector3.Dot(p, v0)) / v0.sqrMagnitude * v0;
-            if (Vector3.Distance(v0 * 100, newP) < Vector3.Distance(v0 * 100, max.Item1))
+        { 
+            var delta = (Vector3.Dot(p, lambda)) / lambda.sqrMagnitude;
+            if (delta > max)
             {
-                max = new Tuple<Vector3, Vector3>(newP, p);
+                max = delta;
             }
-            if (Vector3.Distance(v0 * -100, newP) < Vector3.Distance(v0 * -100, min.Item1))
+            if (delta < min)
             {
-                min = new Tuple<Vector3, Vector3>(newP, p);
-            }            
-            pointsProj.Add(newP);
+                min = delta;
+            }
+            //pointsProj.Add(newP);
         }
+        Vector3 maxV3 = max * lambda + bary, minV3 = min * lambda + bary;
 
         //On affiche le bone
         GameObject bone = new GameObject();
         bone.transform.SetParent(parent.transform);
         var lr = bone.AddComponent<LineRenderer>();
         lr.positionCount = 2;
-        lr.SetPosition(0, (min.Item2 + bary));
-        lr.SetPosition(1, (max.Item2 + bary));
+        lr.SetPosition(0, maxV3);
+        lr.SetPosition(1, minV3);
         lr.startWidth = .05f;
         lr.endWidth = .05f;
         lr.sharedMaterial = boneMat;
 
-        return new Tuple<Vector3, Vector3>(min.Item2 + bary, max.Item2 + bary);
+        return new Tuple<Vector3, Vector3>(minV3, maxV3);
     }
 
     Vector3 getBarycentre(List<Vector3> points)
@@ -174,7 +177,7 @@ public class BonesGenerator : MonoBehaviour
         return mat;
     }
 
-    Tuple<float, Vector3> methodePuissance(Matrix4x4 mat)
+    Vector3 methodePuissance(Matrix4x4 mat)
     {
         Vector3 v0 = new Vector3(1, 0, 0);
         var lambdaK = 0.0f;
@@ -189,7 +192,7 @@ public class BonesGenerator : MonoBehaviour
             v0 = (1 / lambdaK) * mul;
         }
 
-        return new Tuple<float, Vector3>(lambdaK, v0);
+        return v0;
     }
 
     List<Vector3> getPoints(GameObject go)
